@@ -10,7 +10,7 @@ import (
 	"github.com/apardo/mikrom-go/config"
 	"github.com/apardo/mikrom-go/internal/repository"
 	"github.com/apardo/mikrom-go/pkg/database"
-	"github.com/apardo/mikrom-go/pkg/firecracker"
+	"github.com/apardo/mikrom-go/pkg/grpcclient"
 	"github.com/apardo/mikrom-go/pkg/worker"
 )
 
@@ -30,18 +30,21 @@ func main() {
 	vmRepo := repository.NewVMRepository(db.DB)
 	ipPoolRepo := repository.NewIPPoolRepository(db.DB)
 
-	// Initialize Firecracker client
-	log.Printf("Initializing Firecracker client (deploy_path=%s, host=%s)...",
-		cfg.FirecrackerDeployPath, cfg.FirecrackerDefaultHost)
-	fcClient := firecracker.NewClient(cfg.FirecrackerDeployPath, cfg.FirecrackerDefaultHost)
+	// Initialize gRPC client to firecracker-agent
+	log.Printf("Connecting to firecracker-agent at %s...", cfg.FirecrackerAgentAddr)
+	grpcClient, err := grpcclient.NewClient(cfg.FirecrackerAgentAddr)
+	if err != nil {
+		log.Fatalf("Failed to connect to firecracker-agent: %v", err)
+	}
+	defer grpcClient.Close()
 
-	// Check Firecracker/Ansible health
+	// Check firecracker-agent health
 	ctx := context.Background()
-	if err := fcClient.CheckHealth(ctx); err != nil {
-		log.Printf("WARNING: Firecracker/Ansible health check failed: %v", err)
+	if err := grpcClient.HealthCheck(ctx); err != nil {
+		log.Printf("WARNING: firecracker-agent health check failed: %v", err)
 		log.Println("Worker will start but VM operations may fail")
 	} else {
-		log.Println("Firecracker/Ansible health check passed")
+		log.Println("firecracker-agent health check passed")
 	}
 
 	// Initialize task handler
@@ -49,8 +52,7 @@ func main() {
 		db.DB,
 		vmRepo,
 		ipPoolRepo,
-		fcClient,
-		cfg.FirecrackerDeployPath,
+		grpcClient,
 	)
 
 	// Initialize worker server

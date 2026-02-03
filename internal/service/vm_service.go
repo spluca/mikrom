@@ -11,12 +11,22 @@ import (
 	"github.com/apardo/mikrom-go/pkg/worker"
 )
 
-type VMService struct {
-	vmRepo       *repository.VMRepository
-	workerClient *worker.Client
+// WorkerClient defines the interface for enqueueing VM tasks
+type WorkerClient interface {
+	EnqueueCreateVM(payload *worker.CreateVMPayload) error
+	EnqueueDeleteVM(payload *worker.DeleteVMPayload) error
+	EnqueueStartVM(payload *worker.StartVMPayload) error
+	EnqueueStopVM(payload *worker.StopVMPayload) error
+	EnqueueRestartVM(payload *worker.RestartVMPayload) error
+	Close() error
 }
 
-func NewVMService(vmRepo *repository.VMRepository, workerClient *worker.Client) *VMService {
+type VMService struct {
+	vmRepo       *repository.VMRepository
+	workerClient WorkerClient
+}
+
+func NewVMService(vmRepo *repository.VMRepository, workerClient WorkerClient) *VMService {
 	return &VMService{
 		vmRepo:       vmRepo,
 		workerClient: workerClient,

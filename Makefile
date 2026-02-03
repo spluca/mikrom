@@ -151,7 +151,7 @@ clean:
 ## docker-up: Inicia PostgreSQL con Docker Compose
 docker-up:
 	@echo "Iniciando PostgreSQL..."
-	docker-compose up -d
+	docker compose up -d
 	@echo "✓ PostgreSQL iniciado en puerto 5432"
 
 ## docker-down: Detiene y elimina contenedores Docker

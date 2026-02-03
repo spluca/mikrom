@@ -8,18 +8,17 @@ import (
 
 	"github.com/apardo/mikrom-go/internal/models"
 	"github.com/apardo/mikrom-go/internal/repository"
-	"github.com/apardo/mikrom-go/pkg/firecracker"
+	"github.com/apardo/mikrom-go/pkg/grpcclient"
 	"github.com/hibiken/asynq"
 	"gorm.io/gorm"
 )
 
 // TaskHandler handles background tasks for VM operations
 type TaskHandler struct {
-	db              *gorm.DB
-	vmRepo          *repository.VMRepository
-	ipPoolRepo      *repository.IPPoolRepository
-	fcClient        *firecracker.Client
-	firecrackerPath string
+	db         *gorm.DB
+	vmRepo     *repository.VMRepository
+	ipPoolRepo *repository.IPPoolRepository
+	grpcClient *grpcclient.Client
 }
 
 // NewTaskHandler creates a new task handler
@@ -27,15 +26,13 @@ func NewTaskHandler(
 	db *gorm.DB,
 	vmRepo *repository.VMRepository,
 	ipPoolRepo *repository.IPPoolRepository,
-	fcClient *firecracker.Client,
-	firecrackerPath string,
+	grpcClient *grpcclient.Client,
 ) *TaskHandler {
 	return &TaskHandler{
-		db:              db,
-		vmRepo:          vmRepo,
-		ipPoolRepo:      ipPoolRepo,
-		fcClient:        fcClient,
-		firecrackerPath: firecrackerPath,
+		db:         db,
+		vmRepo:     vmRepo,
+		ipPoolRepo: ipPoolRepo,
+		grpcClient: grpcClient,
 	}
 }
 
@@ -61,7 +58,7 @@ func (h *TaskHandler) HandleCreateVM(ctx context.Context, t *asynq.Task) error {
 		errMsg := fmt.Sprintf("No active IP pool available: %v", err)
 		log.Printf("[CreateVM] %s", errMsg)
 		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	allocation, err := h.ipPoolRepo.AllocateIP(int(activePool.ID), payload.VMID)
@@ -69,7 +66,7 @@ func (h *TaskHandler) HandleCreateVM(ctx context.Context, t *asynq.Task) error {
 		errMsg := fmt.Sprintf("Failed to allocate IP: %v", err)
 		log.Printf("[CreateVM] %s", errMsg)
 		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	log.Printf("[CreateVM] Allocated IP %s for VM %s", allocation.IPAddress, payload.VMID)
@@ -82,7 +79,7 @@ func (h *TaskHandler) HandleCreateVM(ctx context.Context, t *asynq.Task) error {
 		// Release IP on failure
 		h.ipPoolRepo.ReleaseIP(allocation.IPAddress)
 		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	vm.IPAddress = allocation.IPAddress
@@ -92,40 +89,41 @@ func (h *TaskHandler) HandleCreateVM(ctx context.Context, t *asynq.Task) error {
 		// Release IP on failure
 		h.ipPoolRepo.ReleaseIP(allocation.IPAddress)
 		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
-	// Step 3: Execute Ansible playbook to create VM
-	log.Printf("[CreateVM] Executing Ansible playbook for VM %s", payload.VMID)
+	// Step 3: Create VM via gRPC
+	log.Printf("[CreateVM] Creating VM via gRPC for %s", payload.VMID)
 
-	fcParams := firecracker.CreateVMParams{
+	grpcParams := grpcclient.CreateVMParams{
 		VMName:     payload.VMID,
-		VCPUCount:  payload.VCPUCount,
-		MemoryMB:   payload.MemoryMB,
+		VCPUCount:  int32(payload.VCPUCount),
+		MemoryMB:   int32(payload.MemoryMB),
 		IPAddress:  allocation.IPAddress,
 		KernelPath: payload.KernelPath,
 		RootfsPath: payload.RootfsPath,
 	}
 
-	result, err := h.fcClient.CreateVM(ctx, fcParams)
+	result, err := h.grpcClient.CreateVM(ctx, grpcParams)
 	if err != nil || !result.Success {
-		errMsg := fmt.Sprintf("Ansible playbook failed: %v (output: %s)", err, result.Error)
+		errMsg := fmt.Sprintf("gRPC CreateVM failed: %v (error: %s)", err, result.Error)
 		log.Printf("[CreateVM] %s", errMsg)
 		// Release IP on failure
 		h.ipPoolRepo.ReleaseIP(allocation.IPAddress)
 		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
-	log.Printf("[CreateVM] Ansible playbook succeeded for VM %s", payload.VMID)
+	log.Printf("[CreateVM] gRPC CreateVM succeeded for VM %s with state: %s", payload.VMID, result.State)
 
-	// Step 4: Update VM status to running
-	if err := h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusRunning, ""); err != nil {
-		log.Printf("[CreateVM] Failed to update status to running: %v", err)
+	// Step 4: Update VM status based on actual state from agent
+	vmStatus := result.GetVMStatus()
+	if err := h.vmRepo.UpdateStatus(payload.VMID, vmStatus, ""); err != nil {
+		log.Printf("[CreateVM] Failed to update status to %s: %v", vmStatus, err)
 		return err
 	}
 
-	log.Printf("[CreateVM] VM %s created successfully", payload.VMID)
+	log.Printf("[CreateVM] VM %s created successfully with status: %s", payload.VMID, vmStatus)
 	return nil
 }
 
@@ -150,21 +148,21 @@ func (h *TaskHandler) HandleDeleteVM(ctx context.Context, t *asynq.Task) error {
 		ipAddress = vm.IPAddress
 	}
 
-	// Step 1: Execute Ansible cleanup playbook
+	// Step 1: Delete VM via gRPC
+	log.Printf("[DeleteVM] Deleting VM via gRPC for %s", payload.VMID)
+
+	result, err := h.grpcClient.DeleteVM(ctx, payload.VMID)
+	if err != nil || !result.Success {
+		errMsg := fmt.Sprintf("gRPC DeleteVM failed: %v (error: %s)", err, result.Error)
+		log.Printf("[DeleteVM] %s", errMsg)
+		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
+		return fmt.Errorf("%s", errMsg)
+	}
+
+	log.Printf("[DeleteVM] gRPC DeleteVM succeeded for VM %s", payload.VMID)
+
+	// Step 2: Release IP address
 	if ipAddress != "" {
-		log.Printf("[DeleteVM] Executing Ansible cleanup for VM %s", payload.VMID)
-
-		result, err := h.fcClient.CleanupVM(ctx, payload.VMID, ipAddress)
-		if err != nil || !result.Success {
-			errMsg := fmt.Sprintf("Ansible cleanup failed: %v (output: %s)", err, result.Error)
-			log.Printf("[DeleteVM] %s", errMsg)
-			h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-			return fmt.Errorf(errMsg)
-		}
-
-		log.Printf("[DeleteVM] Ansible cleanup succeeded for VM %s", payload.VMID)
-
-		// Step 2: Release IP address
 		log.Printf("[DeleteVM] Releasing IP %s for VM %s", ipAddress, payload.VMID)
 		if err := h.ipPoolRepo.ReleaseIP(ipAddress); err != nil {
 			log.Printf("[DeleteVM] Failed to release IP: %v", err)
@@ -192,24 +190,25 @@ func (h *TaskHandler) HandleStartVM(ctx context.Context, t *asynq.Task) error {
 
 	log.Printf("[StartVM] Starting VM %s", payload.VMID)
 
-	// Execute Ansible start playbook
-	result, err := h.fcClient.StartVM(ctx, payload.VMID, payload.IPAddress)
+	// Start VM via gRPC
+	result, err := h.grpcClient.StartVM(ctx, payload.VMID)
 	if err != nil || !result.Success {
-		errMsg := fmt.Sprintf("Ansible start failed: %v (output: %s)", err, result.Error)
+		errMsg := fmt.Sprintf("gRPC StartVM failed: %v (error: %s)", err, result.Error)
 		log.Printf("[StartVM] %s", errMsg)
 		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
-	log.Printf("[StartVM] Ansible start succeeded for VM %s", payload.VMID)
+	log.Printf("[StartVM] gRPC StartVM succeeded for VM %s with state: %s", payload.VMID, result.State)
 
-	// Update VM status to running
-	if err := h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusRunning, ""); err != nil {
-		log.Printf("[StartVM] Failed to update status to running: %v", err)
+	// Update VM status based on actual state from agent
+	vmStatus := result.GetVMStatus()
+	if err := h.vmRepo.UpdateStatus(payload.VMID, vmStatus, ""); err != nil {
+		log.Printf("[StartVM] Failed to update status to %s: %v", vmStatus, err)
 		return err
 	}
 
-	log.Printf("[StartVM] VM %s started successfully", payload.VMID)
+	log.Printf("[StartVM] VM %s started successfully with status: %s", payload.VMID, vmStatus)
 	return nil
 }
 
@@ -222,24 +221,25 @@ func (h *TaskHandler) HandleStopVM(ctx context.Context, t *asynq.Task) error {
 
 	log.Printf("[StopVM] Stopping VM %s", payload.VMID)
 
-	// Execute Ansible stop playbook
-	result, err := h.fcClient.StopVM(ctx, payload.VMID, payload.IPAddress)
+	// Stop VM via gRPC
+	result, err := h.grpcClient.StopVM(ctx, payload.VMID, false)
 	if err != nil || !result.Success {
-		errMsg := fmt.Sprintf("Ansible stop failed: %v (output: %s)", err, result.Error)
+		errMsg := fmt.Sprintf("gRPC StopVM failed: %v (error: %s)", err, result.Error)
 		log.Printf("[StopVM] %s", errMsg)
 		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
-	log.Printf("[StopVM] Ansible stop succeeded for VM %s", payload.VMID)
+	log.Printf("[StopVM] gRPC StopVM succeeded for VM %s with state: %s", payload.VMID, result.State)
 
-	// Update VM status to stopped
-	if err := h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusStopped, ""); err != nil {
-		log.Printf("[StopVM] Failed to update status to stopped: %v", err)
+	// Update VM status based on actual state from agent
+	vmStatus := result.GetVMStatus()
+	if err := h.vmRepo.UpdateStatus(payload.VMID, vmStatus, ""); err != nil {
+		log.Printf("[StopVM] Failed to update status to %s: %v", vmStatus, err)
 		return err
 	}
 
-	log.Printf("[StopVM] VM %s stopped successfully", payload.VMID)
+	log.Printf("[StopVM] VM %s stopped successfully with status: %s", payload.VMID, vmStatus)
 	return nil
 }
 
@@ -256,34 +256,35 @@ func (h *TaskHandler) HandleRestartVM(ctx context.Context, t *asynq.Task) error 
 	log.Printf("[RestartVM] Stopping VM %s", payload.VMID)
 	h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusStopping, "")
 
-	result, err := h.fcClient.StopVM(ctx, payload.VMID, payload.IPAddress)
+	result, err := h.grpcClient.StopVM(ctx, payload.VMID, false)
 	if err != nil || !result.Success {
-		errMsg := fmt.Sprintf("Ansible stop failed during restart: %v (output: %s)", err, result.Error)
+		errMsg := fmt.Sprintf("gRPC StopVM failed during restart: %v (error: %s)", err, result.Error)
 		log.Printf("[RestartVM] %s", errMsg)
 		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Step 2: Start the VM
 	log.Printf("[RestartVM] Starting VM %s", payload.VMID)
 	h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusStarting, "")
 
-	result, err = h.fcClient.StartVM(ctx, payload.VMID, payload.IPAddress)
+	result, err = h.grpcClient.StartVM(ctx, payload.VMID)
 	if err != nil || !result.Success {
-		errMsg := fmt.Sprintf("Ansible start failed during restart: %v (output: %s)", err, result.Error)
+		errMsg := fmt.Sprintf("gRPC StartVM failed during restart: %v (error: %s)", err, result.Error)
 		log.Printf("[RestartVM] %s", errMsg)
 		h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusError, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
-	log.Printf("[RestartVM] Ansible restart succeeded for VM %s", payload.VMID)
+	log.Printf("[RestartVM] gRPC restart succeeded for VM %s with state: %s", payload.VMID, result.State)
 
-	// Update VM status to running
-	if err := h.vmRepo.UpdateStatus(payload.VMID, models.VMStatusRunning, ""); err != nil {
-		log.Printf("[RestartVM] Failed to update status to running: %v", err)
+	// Update VM status based on actual state from agent
+	vmStatus := result.GetVMStatus()
+	if err := h.vmRepo.UpdateStatus(payload.VMID, vmStatus, ""); err != nil {
+		log.Printf("[RestartVM] Failed to update status to %s: %v", vmStatus, err)
 		return err
 	}
 
-	log.Printf("[RestartVM] VM %s restarted successfully", payload.VMID)
+	log.Printf("[RestartVM] VM %s restarted successfully with status: %s", payload.VMID, vmStatus)
 	return nil
 }

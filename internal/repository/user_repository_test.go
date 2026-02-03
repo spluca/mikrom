@@ -1,194 +1,211 @@
 package repository
 
 import (
-	"database/sql"
-	"errors"
 	"testing"
-	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/apardo/mikrom-go/internal/models"
 	"github.com/stretchr/testify/assert"
 )
 
-func setupMockDB(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("Error creating mock database: %v", err)
-	}
-	return db, mock
-}
-
 func TestCreate_Success(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
 
 	repo := NewUserRepository(db)
-	now := time.Now()
 
 	user := &models.User{
 		Email:        "test@example.com",
 		PasswordHash: "hashedpassword",
 		Name:         "Test User",
 	}
-
-	mock.ExpectQuery(`INSERT INTO users`).
-		WithArgs(user.Email, user.PasswordHash, user.Name).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
-			AddRow(1, now, now))
 
 	err := repo.Create(user)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 1, user.ID)
+	assert.NotZero(t, user.ID)
 	assert.NotZero(t, user.CreatedAt)
 	assert.NotZero(t, user.UpdatedAt)
-	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// Verify user was actually created
+	var found models.User
+	db.First(&found, user.ID)
+	assert.Equal(t, user.Email, found.Email)
+	assert.Equal(t, user.Name, found.Name)
 }
 
 func TestCreate_Error(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
 
 	repo := NewUserRepository(db)
+
+	// Close the database to simulate error
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
 
 	user := &models.User{
 		Email:        "test@example.com",
 		PasswordHash: "hashedpassword",
 		Name:         "Test User",
 	}
-
-	mock.ExpectQuery(`INSERT INTO users`).
-		WithArgs(user.Email, user.PasswordHash, user.Name).
-		WillReturnError(errors.New("database error"))
-
 	err := repo.Create(user)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "error creating user")
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestFindByEmail_Success(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
 
 	repo := NewUserRepository(db)
-	now := time.Now()
 
-	email := "test@example.com"
+	// Create a user first
+	expected := &models.User{
+		Email:        "test@example.com",
+		PasswordHash: "hashedpassword",
+		Name:         "Test User",
+	}
+	db.Create(expected)
 
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email`).
-		WithArgs(email).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "email", "password_hash", "name", "created_at", "updated_at"}).
-			AddRow(1, email, "hashedpassword", "Test User", now, now))
-
-	user, err := repo.FindByEmail(email)
+	// Find the user
+	user, err := repo.FindByEmail("test@example.com")
 
 	assert.NoError(t, err)
 	assert.NotNil(t, user)
-	assert.Equal(t, 1, user.ID)
-	assert.Equal(t, email, user.Email)
-	assert.Equal(t, "hashedpassword", user.PasswordHash)
-	assert.Equal(t, "Test User", user.Name)
-	assert.NoError(t, mock.ExpectationsWereMet())
+	assert.Equal(t, expected.ID, user.ID)
+	assert.Equal(t, expected.Email, user.Email)
+	assert.Equal(t, expected.PasswordHash, user.PasswordHash)
+	assert.Equal(t, expected.Name, user.Name)
 }
 
 func TestFindByEmail_NotFound(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
 
 	repo := NewUserRepository(db)
-	email := "notfound@example.com"
 
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email`).
-		WithArgs(email).
-		WillReturnError(sql.ErrNoRows)
-
-	user, err := repo.FindByEmail(email)
+	user, err := repo.FindByEmail("notfound@example.com")
 
 	assert.NoError(t, err)
 	assert.Nil(t, user)
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestFindByEmail_Error(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
 
 	repo := NewUserRepository(db)
-	email := "test@example.com"
 
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email`).
-		WithArgs(email).
-		WillReturnError(errors.New("database error"))
+	// Close the database to simulate error
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
 
-	user, err := repo.FindByEmail(email)
+	user, err := repo.FindByEmail("test@example.com")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
 	assert.Contains(t, err.Error(), "error finding user")
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestFindByID_Success(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
 
 	repo := NewUserRepository(db)
-	now := time.Now()
 
-	userID := 1
+	// Create a user first
+	expected := &models.User{
+		Email:        "test@example.com",
+		PasswordHash: "hashedpassword",
+		Name:         "Test User",
+	}
+	db.Create(expected)
 
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE id`).
-		WithArgs(userID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "email", "password_hash", "name", "created_at", "updated_at"}).
-			AddRow(1, "test@example.com", "hashedpassword", "Test User", now, now))
-
-	user, err := repo.FindByID(userID)
+	// Find the user
+	user, err := repo.FindByID(int(expected.ID))
 
 	assert.NoError(t, err)
 	assert.NotNil(t, user)
-	assert.Equal(t, 1, user.ID)
-	assert.Equal(t, "test@example.com", user.Email)
-	assert.Equal(t, "hashedpassword", user.PasswordHash)
-	assert.Equal(t, "Test User", user.Name)
-	assert.NoError(t, mock.ExpectationsWereMet())
+	assert.Equal(t, expected.ID, user.ID)
+	assert.Equal(t, expected.Email, user.Email)
+	assert.Equal(t, expected.PasswordHash, user.PasswordHash)
+	assert.Equal(t, expected.Name, user.Name)
 }
 
 func TestFindByID_NotFound(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
 
 	repo := NewUserRepository(db)
-	userID := 999
 
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE id`).
-		WithArgs(userID).
-		WillReturnError(sql.ErrNoRows)
-
-	user, err := repo.FindByID(userID)
+	user, err := repo.FindByID(999)
 
 	assert.NoError(t, err)
 	assert.Nil(t, user)
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestFindByID_Error(t *testing.T) {
-	db, mock := setupMockDB(t)
-	defer db.Close()
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
 
 	repo := NewUserRepository(db)
-	userID := 1
 
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE id`).
-		WithArgs(userID).
-		WillReturnError(errors.New("database error"))
+	// Close the database to simulate error
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
 
-	user, err := repo.FindByID(userID)
+	user, err := repo.FindByID(1)
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
 	assert.Contains(t, err.Error(), "error finding user")
-	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// Additional test: Multiple users
+func TestFindByEmail_MultipleUsers(t *testing.T) {
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
+
+	repo := NewUserRepository(db)
+
+	// Create multiple users
+	users := []*models.User{
+		{Email: "user1@example.com", PasswordHash: "hash1", Name: "User 1"},
+		{Email: "user2@example.com", PasswordHash: "hash2", Name: "User 2"},
+		{Email: "user3@example.com", PasswordHash: "hash3", Name: "User 3"},
+	}
+
+	for _, u := range users {
+		db.Create(u)
+	}
+
+	// Find each user
+	for _, expected := range users {
+		found, err := repo.FindByEmail(expected.Email)
+		assert.NoError(t, err)
+		assert.NotNil(t, found)
+		assert.Equal(t, expected.Email, found.Email)
+		assert.Equal(t, expected.Name, found.Name)
+	}
+}
+
+// Additional test: Create with validation
+func TestCreate_EmptyEmail(t *testing.T) {
+	db := SetupTestDB(t)
+	defer CleanupTestDB(t, db)
+
+	repo := NewUserRepository(db)
+
+	user := &models.User{
+		Email:        "", // Empty email
+		PasswordHash: "hashedpassword",
+		Name:         "Test User",
+	}
+
+	err := repo.Create(user)
+
+	// GORM should allow empty email unless we add validation
+	// This test documents current behavior
+	assert.NoError(t, err)
 }

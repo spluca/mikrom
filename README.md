@@ -1,6 +1,6 @@
 # Mikrom-Go - Firecracker VM Management API
 
-A high-performance REST API for managing Firecracker microVMs built with Go, featuring asynchronous task processing, IP pool management, and Ansible-based VM provisioning.
+A high-performance REST API for managing Firecracker microVMs built with Go, featuring asynchronous task processing, IP pool management, and gRPC-based VM provisioning via firecracker-agent.
 
 ## 🚀 Features
 
@@ -8,7 +8,7 @@ A high-performance REST API for managing Firecracker microVMs built with Go, fea
 - **VM Lifecycle Management** - Create, start, stop, restart, delete VMs
 - **Asynchronous Operations** - Background workers with Redis/asynq
 - **IP Pool Management** - Automatic IP allocation from configurable pools
-- **Ansible Integration** - VM provisioning via Ansible playbooks
+- **gRPC Integration** - Fast VM provisioning via firecracker-agent
 - **RESTful API** - Clean, well-documented API endpoints
 - **Database Migrations** - GORM-based auto-migrations
 - **Docker Support** - Complete docker-compose setup
@@ -18,7 +18,7 @@ A high-performance REST API for managing Firecracker microVMs built with Go, fea
 - Go 1.21 or later
 - PostgreSQL 15+
 - Redis 7+
-- Ansible 2.10+ (for VM provisioning)
+- firecracker-agent running and accessible (for VM provisioning)
 - Docker & Docker Compose (optional)
 
 ## 🛠️ Installation
@@ -205,11 +205,11 @@ curl -X GET http://localhost:8080/api/v1/ippools/stats \
                         │   Queue     │ <────── │  Workers    │
                         └─────────────┘         └─────────────┘
                                                       │
-                                                      │ Execute
+                                                      │ gRPC Call
                                                       ▼
                                                 ┌─────────────┐
-                                                │  Ansible    │
-                                                │  Playbooks  │
+                                                │ firecracker │
+                                                │   -agent    │
                                                 └─────────────┘
                                                       │
                                                       ▼
@@ -242,9 +242,8 @@ REDIS_ADDR=localhost:6379
 REDIS_PASSWORD=
 REDIS_DB=0
 
-# Firecracker
-FIRECRACKER_DEPLOY_PATH=/path/to/firecracker-deploy
-FIRECRACKER_DEFAULT_HOST=your-firecracker-host
+# Firecracker Agent
+FIRECRACKER_AGENT_ADDR=localhost:50051
 
 # Worker
 WORKER_CONCURRENCY=10
@@ -267,7 +266,7 @@ mikrom-go/
 │   └── service/       # Business logic
 ├── pkg/
 │   ├── database/      # Database connection
-│   ├── firecracker/   # Firecracker/Ansible client
+│   ├── grpcclient/    # gRPC client for firecracker-agent
 │   ├── utils/         # Utility functions
 │   └── worker/        # Task queue (asynq)
 └── scripts/           # Helper scripts
@@ -347,7 +346,7 @@ This project is licensed under the MIT License.
 
 ## 👥 Authors
 
-- Antonio Pardo - [@apardo](https://github.com/apardo)
+- Antonio Pardo - [@apardo](https://git.spluca.org/apardo)
 
 ## 🙏 Acknowledgments
 

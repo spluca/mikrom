@@ -80,3 +80,80 @@ func TestHashPassword_SamePasswordDifferentHashes(t *testing.T) {
 	assert.True(t, CheckPassword(password, hash1))
 	assert.True(t, CheckPassword(password, hash2))
 }
+
+func TestHashPassword_LongPassword(t *testing.T) {
+	// Bcrypt has a max length of 72 bytes - test that it returns an error
+	password := string(make([]byte, 100)) + "test"
+
+	hash, err := HashPassword(password)
+
+	// Should return an error for passwords > 72 bytes
+	assert.Error(t, err, "Should error on password > 72 bytes")
+	assert.Empty(t, hash)
+	assert.Contains(t, err.Error(), "password length exceeds 72 bytes")
+}
+
+func TestHashPassword_ExactlyMaxLength(t *testing.T) {
+	// Test with exactly 72 bytes (the max)
+	password := string(make([]byte, 72))
+
+	hash, err := HashPassword(password)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, hash)
+	assert.True(t, CheckPassword(password, hash))
+}
+
+func TestHashPassword_SpecialCharacters(t *testing.T) {
+	passwords := []string{
+		"p@ssw0rd!",
+		"пароль", // Cyrillic
+		"密码",     // Chinese
+		"contraseña",
+		"!@#$%^&*()",
+		"pass word with spaces",
+	}
+
+	for _, password := range passwords {
+		hash, err := HashPassword(password)
+		assert.NoError(t, err, "Should hash password: %s", password)
+		assert.NotEmpty(t, hash)
+		assert.True(t, CheckPassword(password, hash), "Should validate password: %s", password)
+	}
+}
+
+func TestCheckPassword_EmptyHash(t *testing.T) {
+	password := "mySecurePassword123"
+	emptyHash := ""
+
+	result := CheckPassword(password, emptyHash)
+
+	assert.False(t, result, "Empty hash should return false")
+}
+
+func TestCheckPassword_BothEmpty(t *testing.T) {
+	result := CheckPassword("", "")
+
+	assert.False(t, result, "Both empty should return false")
+}
+
+func TestHashPassword_VeryShortPassword(t *testing.T) {
+	password := "a"
+
+	hash, err := HashPassword(password)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, hash)
+	assert.True(t, CheckPassword(password, hash))
+}
+
+func TestCheckPassword_CaseSensitive(t *testing.T) {
+	password := "MySecurePassword"
+	hash, err := HashPassword(password)
+	assert.NoError(t, err)
+
+	// Password should be case-sensitive
+	assert.True(t, CheckPassword("MySecurePassword", hash))
+	assert.False(t, CheckPassword("mysecurepassword", hash))
+	assert.False(t, CheckPassword("MYSECUREPASSWORD", hash))
+}

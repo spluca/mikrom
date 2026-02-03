@@ -1,28 +1,18 @@
 package service
 
 import (
-	"database/sql"
-	"errors"
 	"testing"
-	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/apardo/mikrom-go/internal/models"
 	"github.com/apardo/mikrom-go/internal/repository"
+	"github.com/apardo/mikrom-go/pkg/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func setupMockDBService(t *testing.T) (*sql.DB, sqlmock.Sqlmock) {
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatalf("Error creating mock database: %v", err)
-	}
-	return db, mock
-}
-
 func TestRegister_Success(t *testing.T) {
-	db, mock := setupMockDBService(t)
-	defer db.Close()
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
 
 	userRepo := repository.NewUserRepository(db)
 	authService := NewAuthService(userRepo, "test-secret")
@@ -33,63 +23,62 @@ func TestRegister_Success(t *testing.T) {
 		Name:     "Test User",
 	}
 
-	// Mock para FindByEmail (no existe)
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email`).
-		WithArgs(req.Email).
-		WillReturnError(sql.ErrNoRows)
-
-	// Mock para Create
-	now := time.Now()
-	mock.ExpectQuery(`INSERT INTO users`).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at"}).
-			AddRow(1, now, now))
-
 	user, err := authService.Register(req)
 
 	assert.NoError(t, err)
-	assert.NotNil(t, user)
-	assert.Equal(t, 1, user.ID)
+	require.NotNil(t, user)
+	assert.NotZero(t, user.ID)
 	assert.Equal(t, req.Email, user.Email)
 	assert.Equal(t, req.Name, user.Name)
 	assert.NotEmpty(t, user.PasswordHash)
 	assert.NotEqual(t, req.Password, user.PasswordHash, "Password should be hashed")
-	assert.NoError(t, mock.ExpectationsWereMet())
+
+	// Verify user was created in DB
+	found, err := userRepo.FindByEmail(req.Email)
+	assert.NoError(t, err)
+	assert.NotNil(t, found)
+	assert.Equal(t, user.ID, found.ID)
 }
 
 func TestRegister_EmailAlreadyExists(t *testing.T) {
-	db, mock := setupMockDBService(t)
-	defer db.Close()
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
 
 	userRepo := repository.NewUserRepository(db)
 	authService := NewAuthService(userRepo, "test-secret")
 
+	// Create first user
+	existingUser := &models.User{
+		Email:        "existing@example.com",
+		PasswordHash: "hashedpassword",
+		Name:         "Existing User",
+	}
+	db.Create(existingUser)
+
+	// Try to register with same email
 	req := &models.RegisterRequest{
 		Email:    "existing@example.com",
 		Password: "password123",
 		Name:     "Test User",
 	}
 
-	// Mock para FindByEmail (usuario ya existe)
-	now := time.Now()
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email`).
-		WithArgs(req.Email).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "email", "password_hash", "name", "created_at", "updated_at"}).
-			AddRow(1, req.Email, "hashedpassword", "Existing User", now, now))
-
 	user, err := authService.Register(req)
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
 	assert.Equal(t, "email already exists", err.Error())
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestRegister_FindByEmailError(t *testing.T) {
-	db, mock := setupMockDBService(t)
-	defer db.Close()
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
 
 	userRepo := repository.NewUserRepository(db)
 	authService := NewAuthService(userRepo, "test-secret")
+
+	// Close DB to simulate error
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
 
 	req := &models.RegisterRequest{
 		Email:    "test@example.com",
@@ -97,59 +86,49 @@ func TestRegister_FindByEmailError(t *testing.T) {
 		Name:     "Test User",
 	}
 
-	// Mock para FindByEmail con error
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email`).
-		WithArgs(req.Email).
-		WillReturnError(errors.New("database error"))
-
 	user, err := authService.Register(req)
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestLogin_Success(t *testing.T) {
-	db, mock := setupMockDBService(t)
-	defer db.Close()
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
 
 	userRepo := repository.NewUserRepository(db)
 	authService := NewAuthService(userRepo, "test-secret")
 
 	password := "password123"
-	// Crear un hash real para poder verificar
-	hash := "$2a$10$N9qo8uLOickgx2ZMRZoMye.Jw5R3L6XKo3qH5Q5Q5Q5Q5Q5Q5Q5Q5u" // hash de "password123"
+	// Create user with hashed password
+	hash, err := utils.HashPassword(password)
+	require.NoError(t, err)
+
+	user := &models.User{
+		Email:        "test@example.com",
+		PasswordHash: hash,
+		Name:         "Test User",
+	}
+	db.Create(user)
 
 	req := &models.LoginRequest{
 		Email:    "test@example.com",
 		Password: password,
 	}
 
-	now := time.Now()
-
-	// Mock para FindByEmail
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email`).
-		WithArgs(req.Email).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "email", "password_hash", "name", "created_at", "updated_at"}).
-			AddRow(1, req.Email, hash, "Test User", now, now))
-
 	response, err := authService.Login(req)
 
-	// El test fallará en la verificación del password porque el hash es un ejemplo
-	// pero podemos verificar la estructura del error
-	if err != nil {
-		assert.Equal(t, "invalid credentials", err.Error())
-	} else {
-		assert.NotNil(t, response)
-		assert.NotEmpty(t, response.Token)
-		assert.Equal(t, req.Email, response.User.Email)
-	}
-	assert.NoError(t, mock.ExpectationsWereMet())
+	assert.NoError(t, err)
+	require.NotNil(t, response)
+	assert.NotEmpty(t, response.Token)
+	assert.Equal(t, user.Email, response.User.Email)
+	assert.Equal(t, user.Name, response.User.Name)
+	assert.Equal(t, user.ID, response.User.ID)
 }
 
 func TestLogin_UserNotFound(t *testing.T) {
-	db, mock := setupMockDBService(t)
-	defer db.Close()
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
 
 	userRepo := repository.NewUserRepository(db)
 	authService := NewAuthService(userRepo, "test-secret")
@@ -159,84 +138,117 @@ func TestLogin_UserNotFound(t *testing.T) {
 		Password: "password123",
 	}
 
-	// Mock para FindByEmail (no existe)
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email`).
-		WithArgs(req.Email).
-		WillReturnError(sql.ErrNoRows)
+	response, err := authService.Login(req)
+
+	assert.Error(t, err)
+	assert.Nil(t, response)
+	assert.Equal(t, "invalid credentials", err.Error())
+}
+
+func TestLogin_InvalidPassword(t *testing.T) {
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
+
+	userRepo := repository.NewUserRepository(db)
+	authService := NewAuthService(userRepo, "test-secret")
+
+	// Create user with hashed password
+	correctPassword := "password123"
+	hash, err := utils.HashPassword(correctPassword)
+	require.NoError(t, err)
+
+	user := &models.User{
+		Email:        "test@example.com",
+		PasswordHash: hash,
+		Name:         "Test User",
+	}
+	db.Create(user)
+
+	// Try to login with wrong password
+	req := &models.LoginRequest{
+		Email:    "test@example.com",
+		Password: "wrongpassword",
+	}
 
 	response, err := authService.Login(req)
 
 	assert.Error(t, err)
 	assert.Nil(t, response)
 	assert.Equal(t, "invalid credentials", err.Error())
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestLogin_DatabaseError(t *testing.T) {
-	db, mock := setupMockDBService(t)
-	defer db.Close()
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
 
 	userRepo := repository.NewUserRepository(db)
 	authService := NewAuthService(userRepo, "test-secret")
+
+	// Close DB to simulate error
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
 
 	req := &models.LoginRequest{
 		Email:    "test@example.com",
 		Password: "password123",
 	}
 
-	// Mock para FindByEmail con error
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE email`).
-		WithArgs(req.Email).
-		WillReturnError(errors.New("database error"))
-
 	response, err := authService.Login(req)
 
 	assert.Error(t, err)
 	assert.Nil(t, response)
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestGetUserByID_Success(t *testing.T) {
-	db, mock := setupMockDBService(t)
-	defer db.Close()
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
 
 	userRepo := repository.NewUserRepository(db)
 	authService := NewAuthService(userRepo, "test-secret")
 
-	userID := 1
-	now := time.Now()
+	// Create user
+	expectedUser := &models.User{
+		Email:        "test@example.com",
+		PasswordHash: "hashedpassword",
+		Name:         "Test User",
+	}
+	db.Create(expectedUser)
 
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE id`).
-		WithArgs(userID).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "email", "password_hash", "name", "created_at", "updated_at"}).
-			AddRow(userID, "test@example.com", "hashedpassword", "Test User", now, now))
-
-	user, err := authService.GetUserByID(userID)
+	user, err := authService.GetUserByID(int(expectedUser.ID))
 
 	assert.NoError(t, err)
-	assert.NotNil(t, user)
-	assert.Equal(t, userID, user.ID)
-	assert.Equal(t, "test@example.com", user.Email)
-	assert.Equal(t, "Test User", user.Name)
-	assert.NoError(t, mock.ExpectationsWereMet())
+	require.NotNil(t, user)
+	assert.Equal(t, expectedUser.ID, user.ID)
+	assert.Equal(t, expectedUser.Email, user.Email)
+	assert.Equal(t, expectedUser.Name, user.Name)
 }
 
 func TestGetUserByID_NotFound(t *testing.T) {
-	db, mock := setupMockDBService(t)
-	defer db.Close()
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
 
 	userRepo := repository.NewUserRepository(db)
 	authService := NewAuthService(userRepo, "test-secret")
 
-	userID := 999
-
-	mock.ExpectQuery(`SELECT id, email, password_hash, name, created_at, updated_at FROM users WHERE id`).
-		WithArgs(userID).
-		WillReturnError(sql.ErrNoRows)
-
-	user, err := authService.GetUserByID(userID)
+	user, err := authService.GetUserByID(999)
 
 	assert.NoError(t, err)
 	assert.Nil(t, user)
-	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestGetUserByID_DatabaseError(t *testing.T) {
+	db := repository.SetupTestDB(t)
+	defer repository.CleanupTestDB(t, db)
+
+	userRepo := repository.NewUserRepository(db)
+	authService := NewAuthService(userRepo, "test-secret")
+
+	// Close DB to simulate error
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
+
+	user, err := authService.GetUserByID(1)
+
+	assert.Error(t, err)
+	assert.Nil(t, user)
 }

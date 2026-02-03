@@ -162,3 +162,91 @@ func TestGenerateJWT_ZeroUserID(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, claims.UserID)
 }
+
+func TestGenerateJWT_NegativeUserID(t *testing.T) {
+	userID := -1
+	email := "test@example.com"
+	secret := "test-secret-key"
+
+	token, err := GenerateJWT(userID, email, secret)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, token)
+
+	claims, err := ValidateJWT(token, secret)
+	assert.NoError(t, err)
+	assert.Equal(t, -1, claims.UserID)
+}
+
+func TestGenerateJWT_EmptySecret(t *testing.T) {
+	userID := 123
+	email := "test@example.com"
+	secret := ""
+
+	token, err := GenerateJWT(userID, email, secret)
+
+	// Should still work with empty secret (not recommended in production)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, token)
+}
+
+func TestValidateJWT_EmptySecret(t *testing.T) {
+	userID := 123
+	email := "test@example.com"
+	secret := ""
+
+	token, err := GenerateJWT(userID, email, secret)
+	assert.NoError(t, err)
+
+	claims, err := ValidateJWT(token, secret)
+	assert.NoError(t, err)
+	assert.Equal(t, userID, claims.UserID)
+}
+
+func TestGenerateJWT_LongEmail(t *testing.T) {
+	userID := 123
+	email := "verylongemailaddress" + string(make([]byte, 200)) + "@example.com"
+	secret := "test-secret-key"
+
+	token, err := GenerateJWT(userID, email, secret)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, token)
+
+	claims, err := ValidateJWT(token, secret)
+	assert.NoError(t, err)
+	assert.Equal(t, userID, claims.UserID)
+}
+
+func TestValidateJWT_MalformedToken(t *testing.T) {
+	secret := "test-secret-key"
+	malformedTokens := []string{
+		"not.a.jwt",
+		"only-one-part",
+		"two.parts",
+		"",
+		"Bearer token",
+		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", // Only header
+	}
+
+	for _, token := range malformedTokens {
+		claims, err := ValidateJWT(token, secret)
+		assert.Error(t, err, "Should error on malformed token: %s", token)
+		assert.Nil(t, claims)
+	}
+}
+
+func TestGenerateJWT_SpecialCharactersInEmail(t *testing.T) {
+	userID := 123
+	email := "test+special@example.com"
+	secret := "test-secret-key"
+
+	token, err := GenerateJWT(userID, email, secret)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, token)
+
+	claims, err := ValidateJWT(token, secret)
+	assert.NoError(t, err)
+	assert.Equal(t, email, claims.Email)
+}
