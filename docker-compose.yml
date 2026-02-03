@@ -19,6 +19,21 @@ services:
     networks:
       - mikrom-network
   
+  redis:
+    image: redis:7-alpine
+    container_name: mikrom-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mikrom-network
+  
   adminer:
     image: adminer:latest
     container_name: mikrom-adminer
@@ -33,6 +48,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   mikrom-network:

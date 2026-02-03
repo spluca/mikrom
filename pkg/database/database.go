@@ -1,25 +1,34 @@
 package database
 
 import (
-	"database/sql"
+	"fmt"
 	"log"
 
-	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Database struct {
-	DB *sql.DB
+	DB *gorm.DB
 }
 
 func NewDatabase(connectionString string) (*Database, error) {
-	db, err := sql.Open("postgres", connectionString)
+	db, err := gorm.Open(postgres.Open(connectionString), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Verificar la conexión
-	if err := db.Ping(); err != nil {
-		return nil, err
+	// Test connection
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database instance: %w", err)
+	}
+
+	if err := sqlDB.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	log.Println("Successfully connected to database")
@@ -28,28 +37,19 @@ func NewDatabase(connectionString string) (*Database, error) {
 }
 
 func (d *Database) Close() error {
-	return d.DB.Close()
-}
-
-func (d *Database) CreateTables() error {
-	query := `
-	CREATE TABLE IF NOT EXISTS users (
-		id SERIAL PRIMARY KEY,
-		email VARCHAR(255) UNIQUE NOT NULL,
-		password_hash VARCHAR(255) NOT NULL,
-		name VARCHAR(255) NOT NULL,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	);
-
-	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-	`
-
-	_, err := d.DB.Exec(query)
+	sqlDB, err := d.DB.DB()
 	if err != nil {
 		return err
 	}
+	return sqlDB.Close()
+}
 
-	log.Println("Database tables created successfully")
+// AutoMigrate runs auto migration for given models
+func (d *Database) AutoMigrate(models ...interface{}) error {
+	log.Println("Running auto migration...")
+	if err := d.DB.AutoMigrate(models...); err != nil {
+		return fmt.Errorf("failed to auto migrate: %w", err)
+	}
+	log.Println("Auto migration completed successfully")
 	return nil
 }
