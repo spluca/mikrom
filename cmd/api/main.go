@@ -38,6 +38,7 @@ func main() {
 	// Inicializar repositorios
 	userRepo := repository.NewUserRepository(db.DB)
 	vmRepo := repository.NewVMRepository(db.DB)
+	ipPoolRepo := repository.NewIPPoolRepository(db.DB)
 
 	// Initialize worker client
 	workerClient := worker.NewClient(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
@@ -46,10 +47,12 @@ func main() {
 	// Inicializar servicios
 	authService := service.NewAuthService(userRepo, cfg.JWTSecret)
 	vmService := service.NewVMService(vmRepo, workerClient)
+	ipPoolService := service.NewIPPoolService(ipPoolRepo)
 
 	// Inicializar handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	vmHandler := handlers.NewVMHandler(vmService)
+	ipPoolHandler := handlers.NewIPPoolHandler(ipPoolService)
 
 	// Configurar Gin
 	router := gin.Default()
@@ -82,6 +85,20 @@ func main() {
 			vms.POST("/:vm_id/start", vmHandler.StartVM)
 			vms.POST("/:vm_id/stop", vmHandler.StopVM)
 			vms.POST("/:vm_id/restart", vmHandler.RestartVM)
+		}
+
+		// IP Pool routes (protected - admin only)
+		ippools := api.Group("/ippools")
+		ippools.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+		{
+			ippools.POST("", ipPoolHandler.CreateIPPool)
+			ippools.GET("", ipPoolHandler.ListIPPools)
+			ippools.GET("/stats", ipPoolHandler.GetAllPoolStats)
+			ippools.POST("/suggest-range", ipPoolHandler.SuggestIPRange)
+			ippools.GET("/:id", ipPoolHandler.GetIPPool)
+			ippools.PATCH("/:id", ipPoolHandler.UpdateIPPool)
+			ippools.DELETE("/:id", ipPoolHandler.DeleteIPPool)
+			ippools.GET("/:id/stats", ipPoolHandler.GetPoolStats)
 		}
 	}
 
