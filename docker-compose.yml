@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:18-trixie
+    container_name: mikrom-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mikrom
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mikrom-network
+  
+  adminer:
+    image: adminer:latest
+    container_name: mikrom-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+    networks:
+      - mikrom-network
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres 
+
+volumes:
+  postgres_data:
+
+networks:
+  mikrom-network:
+    driver: bridge

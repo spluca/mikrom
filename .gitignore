@@ -1,0 +1,34 @@
+# Environment variables
+.env
+
+# Test coverage
+coverage.out
+coverage.html
+coverage/
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Logs
+*.log
+build-errors.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Air (hot-reload)
+tmp/
