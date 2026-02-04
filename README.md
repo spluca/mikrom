@@ -1,6 +1,6 @@
-# Mikrom - Firecracker VM Management API
+# Mikrom - Virtual Machine Management API
 
-A high-performance REST API for managing Firecracker microVMs built with Go, featuring asynchronous task processing, IP pool management, and gRPC-based VM provisioning via firecracker-agent.
+A high-performance REST API for managing virtual machines built with Go, featuring asynchronous task processing, IP pool management, and gRPC-based VM provisioning via firecracker-agent.
 
 ## 🚀 Features
 
