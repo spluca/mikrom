@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/apardo/mikrom-go/config"
-	"github.com/apardo/mikrom-go/internal/models"
-	"github.com/apardo/mikrom-go/pkg/database"
+	"github.com/spluca/mikrom/config"
+	"github.com/spluca/mikrom/internal/models"
+	"github.com/spluca/mikrom/pkg/database"
 )
 
 func main() {

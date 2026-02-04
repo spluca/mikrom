@@ -5,10 +5,10 @@ import (
 	"log"
 	"math"
 
-	"github.com/apardo/mikrom-go/internal/models"
-	"github.com/apardo/mikrom-go/internal/repository"
-	"github.com/apardo/mikrom-go/pkg/utils"
-	"github.com/apardo/mikrom-go/pkg/worker"
+	"github.com/spluca/mikrom/internal/models"
+	"github.com/spluca/mikrom/internal/repository"
+	"github.com/spluca/mikrom/pkg/utils"
+	"github.com/spluca/mikrom/pkg/worker"
 )
 
 // WorkerClient defines the interface for enqueueing VM tasks

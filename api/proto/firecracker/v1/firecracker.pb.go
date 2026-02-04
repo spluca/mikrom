@@ -1406,7 +1406,7 @@ const file_api_proto_firecracker_v1_firecracker_proto_rawDesc = "" +
 	"\aListVMs\x12\x1e.firecracker.v1.ListVMsRequest\x1a\x1f.firecracker.v1.ListVMsResponse\x12P\n" +
 	"\rWatchVMEvents\x12$.firecracker.v1.WatchVMEventsRequest\x1a\x17.firecracker.v1.VMEvent0\x01\x12V\n" +
 	"\vGetHostInfo\x12\".firecracker.v1.GetHostInfoRequest\x1a#.firecracker.v1.GetHostInfoResponse\x12V\n" +
-	"\vHealthCheck\x12\".firecracker.v1.HealthCheckRequest\x1a#.firecracker.v1.HealthCheckResponseB>Z<github.com/apardo/mikrom-go/api/proto/firecracker/v1b\x06proto3"
+	"\vHealthCheck\x12\".firecracker.v1.HealthCheckRequest\x1a#.firecracker.v1.HealthCheckResponseB>Z<github.com/spluca/mikrom/api/proto/firecracker/v1b\x06proto3"
 
 var (
 	file_api_proto_firecracker_v1_firecracker_proto_rawDescOnce sync.Once

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/apardo/mikrom-go/internal/models"
-	"github.com/apardo/mikrom-go/internal/repository"
-	"github.com/apardo/mikrom-go/pkg/grpcclient"
+	"github.com/spluca/mikrom/internal/models"
+	"github.com/spluca/mikrom/internal/repository"
+	"github.com/spluca/mikrom/pkg/grpcclient"
 	"github.com/hibiken/asynq"
 	"gorm.io/gorm"
 )

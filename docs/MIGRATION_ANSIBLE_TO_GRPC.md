@@ -1,19 +1,23 @@
 # Migración de Ansible a gRPC
 
-Este documento describe los cambios realizados para eliminar completamente Ansible del proyecto mikrom-go y reemplazarlo con comunicación gRPC hacia firecracker-agent.
+Este documento describe los cambios realizados para eliminar completamente Ansible del proyecto mikrom y reemplazarlo con comunicación gRPC hacia firecracker-agent.
 
 ## Resumen de Cambios
 
 ### 1. Nuevos Componentes
 
-#### **api/proto/firecracker/v1/** 
+#### **api/proto/firecracker/v1/**
+
 Directorio que contiene los archivos Protocol Buffers para la comunicación gRPC:
+
 - `firecracker.proto` - Definición de servicios y mensajes gRPC
 - `firecracker.pb.go` - Código Go generado para los mensajes
 - `firecracker_grpc.pb.go` - Código Go generado para el cliente/servidor gRPC
 
 #### **pkg/grpcclient/client.go**
+
 Nuevo cliente gRPC que reemplaza el antiguo wrapper de Ansible:
+
 - `NewClient(addr string)` - Crea conexión gRPC con firecracker-agent
 - `CreateVM(ctx, params)` - Crea una VM vía gRPC
 - `StartVM(ctx, vmID)` - Inicia una VM vía gRPC
@@ -25,12 +29,15 @@ Nuevo cliente gRPC que reemplaza el antiguo wrapper de Ansible:
 ### 2. Archivos Modificados
 
 #### **config/config.go**
+
 **Cambios:**
+
 - ❌ Eliminado: `FirecrackerDeployPath` (ruta a playbooks de Ansible)
 - ❌ Eliminado: `FirecrackerDefaultHost` (host de Ansible)
 - ✅ Agregado: `FirecrackerAgentAddr` (dirección gRPC del firecracker-agent)
 
 **Nueva configuración:**
+
 ```go
 type Config struct {
     // ...
@@ -40,12 +47,15 @@ type Config struct {
 ```
 
 #### **pkg/worker/handlers.go**
+
 **Cambios:**
+
 - Reemplazado `*firecracker.Client` por `*grpcclient.Client`
 - Eliminado el campo `firecrackerPath`
 - Actualizado `NewTaskHandler()` para recibir el cliente gRPC
 
 **Handlers actualizados:**
+
 - `HandleCreateVM()` - Ahora usa `grpcClient.CreateVM()`
 - `HandleStartVM()` - Ahora usa `grpcClient.StartVM()`
 - `HandleStopVM()` - Ahora usa `grpcClient.StopVM()`
@@ -53,19 +63,23 @@ type Config struct {
 - `HandleDeleteVM()` - Ahora usa `grpcClient.DeleteVM()`
 
 #### **cmd/worker/main.go**
+
 **Cambios:**
+
 - Reemplazado import de `pkg/firecracker` por `pkg/grpcclient`
 - Eliminada inicialización del cliente Ansible
 - Agregada conexión gRPC con firecracker-agent
 - Agregado health check del firecracker-agent
 
 **Antes:**
+
 ```go
 fcClient := firecracker.NewClient(cfg.FirecrackerDeployPath, cfg.FirecrackerDefaultHost)
 taskHandler := worker.NewTaskHandler(db.DB, vmRepo, ipPoolRepo, fcClient, cfg.FirecrackerDeployPath)
 ```
 
 **Después:**
+
 ```go
 grpcClient, err := grpcclient.NewClient(cfg.FirecrackerAgentAddr)
 defer grpcClient.Close()
@@ -73,13 +87,17 @@ taskHandler := worker.NewTaskHandler(db.DB, vmRepo, ipPoolRepo, grpcClient)
 ```
 
 #### **.env.example**
+
 **Cambios:**
+
 - ❌ Eliminado: `FIRECRACKER_DEPLOY_PATH`
 - ❌ Eliminado: `FIRECRACKER_DEFAULT_HOST`
 - ✅ Agregado: `FIRECRACKER_AGENT_ADDR=localhost:50051`
 
 #### **README.md**
+
 **Cambios:**
+
 - Actualizada descripción del proyecto
 - Eliminadas referencias a Ansible en Features
 - Actualizado Prerequisites (Ansible → firecracker-agent)
@@ -90,13 +108,16 @@ taskHandler := worker.NewTaskHandler(db.DB, vmRepo, ipPoolRepo, grpcClient)
 ### 3. Componentes Eliminados
 
 #### **pkg/firecracker/** (directorio completo)
+
 Eliminado el wrapper de Ansible que contenía:
+
 - `client.go` - Cliente que ejecutaba playbooks de Ansible
 - Métodos: `CreateVM()`, `StartVM()`, `StopVM()`, `CleanupVM()`
 
 ### 4. Dependencias Agregadas
 
 Nuevas dependencias en `go.mod`:
+
 ```
 google.golang.org/grpc v1.78.0
 google.golang.org/protobuf v1.36.11
@@ -115,6 +136,7 @@ FIRECRACKER_AGENT_ADDR=localhost:50051
 ```
 
 Si firecracker-agent corre en otro servidor:
+
 ```env
 FIRECRACKER_AGENT_ADDR=192.168.1.100:50051
 ```
@@ -140,14 +162,15 @@ cd /path/to/firecracker-agent
 
 Por defecto, escucha en `localhost:50051`
 
-### 2. Configurar mikrom-go
+### 2. Configurar mikrom
 
 Editar `.env`:
+
 ```env
 FIRECRACKER_AGENT_ADDR=localhost:50051  # o la IP del servidor
 ```
 
-### 3. Iniciar mikrom-go
+### 3. Iniciar mikrom
 
 ```bash
 # Terminal 1: API
@@ -198,6 +221,7 @@ go test ./...
 ### Error: "failed to connect to firecracker-agent"
 
 **Solución:**
+
 1. Verificar que firecracker-agent esté corriendo: `ps aux | grep fc-agent`
 2. Verificar el puerto: `netstat -tulpn | grep 50051`
 3. Revisar la variable `FIRECRACKER_AGENT_ADDR` en `.env`
@@ -205,13 +229,15 @@ go test ./...
 ### Error: "firecracker-agent health check failed"
 
 **Solución:**
+
 1. Verificar logs de firecracker-agent
 2. Intentar curl manual al health endpoint
-3. Revisar firewall/networking entre mikrom-go y firecracker-agent
+3. Revisar firewall/networking entre mikrom y firecracker-agent
 
 ### Worker inicia pero las VMs no se crean
 
 **Solución:**
+
 1. Revisar logs del worker: errores de gRPC
 2. Revisar logs de firecracker-agent: errores de Firecracker
 3. Verificar que Firecracker esté instalado en el servidor del agent
@@ -229,4 +255,4 @@ Para completar la integración:
 
 1. Implementar la Fase 2 de firecracker-agent (integración real con Firecracker)
 2. Agregar soporte para eventos en tiempo real vía gRPC streaming
-3. Implementar TLS/mTLS para comunicación segura entre mikrom-go y firecracker-agent
+3. Implementar TLS/mTLS para comunicación segura entre mikrom y firecracker-agent

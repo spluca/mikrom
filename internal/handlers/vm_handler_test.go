@@ -8,10 +8,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/apardo/mikrom-go/internal/models"
-	"github.com/apardo/mikrom-go/internal/repository"
-	"github.com/apardo/mikrom-go/internal/service"
-	"github.com/apardo/mikrom-go/pkg/worker"
+	"github.com/spluca/mikrom/internal/models"
+	"github.com/spluca/mikrom/internal/repository"
+	"github.com/spluca/mikrom/internal/service"
+	"github.com/spluca/mikrom/pkg/worker"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 )

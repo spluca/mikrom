@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/apardo/mikrom-go/internal/service"
+	"github.com/spluca/mikrom/internal/service"
 	"github.com/gin-gonic/gin"
 )
 

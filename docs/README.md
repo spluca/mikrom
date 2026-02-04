@@ -18,6 +18,7 @@ REST API built with Gin and PostgreSQL for user authentication.
 ### Public
 
 #### Register User
+
 ```bash
 POST /api/v1/auth/register
 Content-Type: application/json
@@ -30,6 +31,7 @@ Content-Type: application/json
 ```
 
 #### Login
+
 ```bash
 POST /api/v1/auth/login
 Content-Type: application/json
@@ -43,12 +45,14 @@ Content-Type: application/json
 ### Protected (require authentication)
 
 #### Get Profile
+
 ```bash
 GET /api/v1/auth/profile
 Authorization: Bearer <token>
 ```
 
 #### Health Check
+
 ```bash
 GET /health
 ```
@@ -68,7 +72,7 @@ GET /health
 ```bash
 # 1. Clone the repository
 git clone <repo-url>
-cd mikrom-go
+cd mikrom
 
 # 2. Initial setup (installs deps and starts DB)
 make setup
@@ -87,17 +91,20 @@ make dev
 **Manual configuration:**
 
 1. **Clone the repository**
+
 ```bash
 git clone <repo-url>
-cd mikrom-go
+cd mikrom
 ```
 
-2. **Configure environment variables**
+1. **Configure environment variables**
+
 ```bash
 cp .env.example .env
 ```
 
 Edit `.env` with your configurations:
+
 ```env
 DB_HOST=localhost
 DB_PORT=5432
@@ -108,7 +115,8 @@ SERVER_PORT=8080
 JWT_SECRET=your-secure-secret-key
 ```
 
-3. **Start PostgreSQL with Docker (optional)**
+1. **Start PostgreSQL with Docker (optional)**
+
 ```bash
 make docker-up
 # Or manually:
@@ -116,18 +124,21 @@ docker-compose up -d
 ```
 
 Or configure your own PostgreSQL instance and create the database:
+
 ```sql
 CREATE DATABASE mikrom;
 ```
 
-4. **Install dependencies**
+1. **Install dependencies**
+
 ```bash
 make install
 # Or manually:
 go mod download
 ```
 
-5. **Run the application**
+1. **Run the application**
+
 ```bash
 make run
 # Or manually:
@@ -155,6 +166,7 @@ make setup             # Complete initial setup
 ```
 
 To see all available commands run:
+
 ```bash
 make help
 ```
@@ -162,7 +174,7 @@ make help
 ## 📁 Project Structure
 
 ```
-mikrom-go/
+mikrom/
 ├── cmd/
 │   └── api/
 │       └── main.go              # Entry point
@@ -194,6 +206,7 @@ mikrom-go/
 ## 🧪 Usage Example
 
 ### 1. Register a user
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
@@ -205,6 +218,7 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
 ```
 
 ### 2. Login
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
@@ -215,6 +229,7 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 ```
 
 Response:
+
 ```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -229,6 +244,7 @@ Response:
 ```
 
 ### 3. Get profile (authenticated)
+
 ```bash
 curl -X GET http://localhost:8080/api/v1/auth/profile \
   -H "Authorization: Bearer <your-token-here>"
@@ -266,7 +282,7 @@ make coverage-html
 ### Test Structure
 
 ```
-mikrom-go/
+mikrom/
 ├── internal/
 │   ├── handlers/auth_handler_test.go
 │   ├── middleware/auth_test.go

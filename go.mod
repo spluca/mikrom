@@ -1,4 +1,4 @@
-module github.com/apardo/mikrom-go
+module github.com/spluca/mikrom
 
 go 1.25.6
 

@@ -80,9 +80,9 @@ import (
     "github.com/golang-jwt/jwt/v5"
     "gorm.io/gorm"
 
-    "github.com/apardo/mikrom-go/config"
-    "github.com/apardo/mikrom-go/internal/models"
-    "github.com/apardo/mikrom-go/internal/repository"
+    "github.com/spluca/mikrom/config"
+    "github.com/spluca/mikrom/internal/models"
+    "github.com/spluca/mikrom/internal/repository"
 )
 ```
 
@@ -302,7 +302,7 @@ go run cmd/worker/main.go   # Start worker (separate terminal)
 ## Project Structure
 
 ```
-mikrom-go/
+mikrom/
 ├── cmd/
 │   ├── api/           # API server entrypoint
 │   ├── worker/        # Background worker entrypoint

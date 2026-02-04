@@ -7,11 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/apardo/mikrom-go/config"
-	"github.com/apardo/mikrom-go/internal/repository"
-	"github.com/apardo/mikrom-go/pkg/database"
-	"github.com/apardo/mikrom-go/pkg/grpcclient"
-	"github.com/apardo/mikrom-go/pkg/worker"
+	"github.com/spluca/mikrom/config"
+	"github.com/spluca/mikrom/internal/repository"
+	"github.com/spluca/mikrom/pkg/database"
+	"github.com/spluca/mikrom/pkg/grpcclient"
+	"github.com/spluca/mikrom/pkg/worker"
 )
 
 func main() {

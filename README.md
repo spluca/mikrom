@@ -1,4 +1,4 @@
-# Mikrom-Go - Firecracker VM Management API
+# Mikrom - Firecracker VM Management API
 
 A high-performance REST API for managing Firecracker microVMs built with Go, featuring asynchronous task processing, IP pool management, and gRPC-based VM provisioning via firecracker-agent.
 
@@ -26,8 +26,8 @@ A high-performance REST API for managing Firecracker microVMs built with Go, fea
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/apardo/mikrom-go.git
-cd mikrom-go
+git clone https://github.com/spluca/mikrom.git
+cd mikrom
 ```
 
 ### 2. Install dependencies
@@ -252,7 +252,7 @@ WORKER_CONCURRENCY=10
 ## 📁 Project Structure
 
 ```
-mikrom-go/
+mikrom/
 ├── cmd/
 │   ├── api/           # API server entry point
 │   ├── worker/        # Background worker entry point
@@ -346,7 +346,7 @@ This project is licensed under the MIT License.
 
 ## 👥 Authors
 
-- Antonio Pardo - [@apardo](https://git.spluca.org/apardo)
+- Antonio Pardo - [@apardo](https://github.com/antpard)
 
 ## 🙏 Acknowledgments
 

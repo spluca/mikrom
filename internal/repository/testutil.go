@@ -3,7 +3,7 @@ package repository
 import (
 	"testing"
 
-	"github.com/apardo/mikrom-go/internal/models"
+	"github.com/spluca/mikrom/internal/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

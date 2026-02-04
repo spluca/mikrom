@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	pb "github.com/apardo/mikrom-go/api/proto/firecracker/v1"
-	"github.com/apardo/mikrom-go/internal/models"
+	pb "github.com/spluca/mikrom/api/proto/firecracker/v1"
+	"github.com/spluca/mikrom/internal/models"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -66,7 +66,7 @@ type VMResponse struct {
 	Error   string
 }
 
-// MapVMStateToStatus maps gRPC VMState to mikrom-go VMStatus
+// MapVMStateToStatus maps gRPC VMState to mikrom VMStatus
 func MapVMStateToStatus(state pb.VMState) models.VMStatus {
 	switch state {
 	case pb.VMState_VM_STATE_CREATING:

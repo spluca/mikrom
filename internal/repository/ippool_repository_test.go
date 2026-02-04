@@ -3,7 +3,7 @@ package repository
 import (
 	"testing"
 
-	"github.com/apardo/mikrom-go/internal/models"
+	"github.com/spluca/mikrom/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

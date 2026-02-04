@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/apardo/mikrom-go/internal/models"
-	"github.com/apardo/mikrom-go/pkg/utils"
+	"github.com/spluca/mikrom/internal/models"
+	"github.com/spluca/mikrom/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 

@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/apardo/mikrom-go/internal/models"
-	"github.com/apardo/mikrom-go/internal/service"
+	"github.com/spluca/mikrom/internal/models"
+	"github.com/spluca/mikrom/internal/service"
 	"github.com/gin-gonic/gin"
 )
 

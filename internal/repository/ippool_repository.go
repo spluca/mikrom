@@ -3,7 +3,7 @@ package repository
 import (
 	"fmt"
 
-	"github.com/apardo/mikrom-go/internal/models"
+	"github.com/spluca/mikrom/internal/models"
 	"gorm.io/gorm"
 )
 

@@ -3,15 +3,15 @@ package main
 import (
 	"log"
 
-	"github.com/apardo/mikrom-go/config"
-	"github.com/apardo/mikrom-go/internal/handlers"
-	"github.com/apardo/mikrom-go/internal/middleware"
-	"github.com/apardo/mikrom-go/internal/models"
-	"github.com/apardo/mikrom-go/internal/repository"
-	"github.com/apardo/mikrom-go/internal/service"
-	"github.com/apardo/mikrom-go/pkg/database"
-	"github.com/apardo/mikrom-go/pkg/worker"
 	"github.com/gin-gonic/gin"
+	"github.com/spluca/mikrom/config"
+	"github.com/spluca/mikrom/internal/handlers"
+	"github.com/spluca/mikrom/internal/middleware"
+	"github.com/spluca/mikrom/internal/models"
+	"github.com/spluca/mikrom/internal/repository"
+	"github.com/spluca/mikrom/internal/service"
+	"github.com/spluca/mikrom/pkg/database"
+	"github.com/spluca/mikrom/pkg/worker"
 )
 
 func main() {

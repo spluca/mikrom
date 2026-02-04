@@ -3,9 +3,9 @@ package service
 import (
 	"testing"
 
-	"github.com/apardo/mikrom-go/internal/models"
-	"github.com/apardo/mikrom-go/internal/repository"
-	"github.com/apardo/mikrom-go/pkg/worker"
+	"github.com/spluca/mikrom/internal/models"
+	"github.com/spluca/mikrom/internal/repository"
+	"github.com/spluca/mikrom/pkg/worker"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
