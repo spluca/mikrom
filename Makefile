@@ -2,10 +2,14 @@
 
 # Variables
 APP_NAME=mikrom-api
+SEED_NAME=mikrom-seed
+WORKER_NAME=mikrom-worker
 VERSION?=1.0.0
 BUILD_DIR=bin
 COVERAGE_DIR=coverage
 MAIN_PATH=cmd/api/main.go
+SEED_PATH=cmd/seed/main.go
+WORKER_PATH=cmd/worker/main.go
 
 # Configuración
 .DEFAULT_GOAL := help
@@ -30,27 +34,39 @@ dev:
 		echo "O ejecuta: make run"; \
 	fi
 
-## build: Compila la aplicación para producción
+## build: Compila la aplicación, seed y worker para producción
 build:
 	@echo "Compilando $(APP_NAME) v$(VERSION)..."
 	@mkdir -p $(BUILD_DIR)
 	go build -ldflags="-s -w -X main.Version=$(VERSION)" -o $(BUILD_DIR)/$(APP_NAME) $(MAIN_PATH)
-	@echo "Binario creado en $(BUILD_DIR)/$(APP_NAME)"
+	go build -ldflags="-s -w -X main.Version=$(VERSION)" -o $(BUILD_DIR)/$(SEED_NAME) $(SEED_PATH)
+	go build -ldflags="-s -w -X main.Version=$(VERSION)" -o $(BUILD_DIR)/$(WORKER_NAME) $(WORKER_PATH)
+	@echo "Binarios creados en $(BUILD_DIR)/"
 
 ## build-linux: Compila para Linux (útil si estás en Mac/Windows)
 build-linux:
 	@echo "Compilando para Linux..."
 	@mkdir -p $(BUILD_DIR)
 	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(APP_NAME)-linux $(MAIN_PATH)
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(SEED_NAME)-linux $(SEED_PATH)
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o $(BUILD_DIR)/$(WORKER_NAME)-linux $(WORKER_PATH)
 
 ## build-all: Compila para múltiples plataformas
 build-all:
 	@echo "Compilando para múltiples plataformas..."
 	@mkdir -p $(BUILD_DIR)
 	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 $(MAIN_PATH)
+	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(SEED_NAME)-linux-amd64 $(SEED_PATH)
+	GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(WORKER_NAME)-linux-amd64 $(WORKER_PATH)
 	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 $(MAIN_PATH)
+	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(SEED_NAME)-darwin-amd64 $(SEED_PATH)
+	GOOS=darwin GOARCH=amd64 go build -o $(BUILD_DIR)/$(WORKER_NAME)-darwin-amd64 $(WORKER_PATH)
 	GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 $(MAIN_PATH)
+	GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(SEED_NAME)-darwin-arm64 $(SEED_PATH)
+	GOOS=darwin GOARCH=arm64 go build -o $(BUILD_DIR)/$(WORKER_NAME)-darwin-arm64 $(WORKER_PATH)
 	GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe $(MAIN_PATH)
+	GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(SEED_NAME)-windows-amd64.exe $(SEED_PATH)
+	GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(WORKER_NAME)-windows-amd64.exe $(WORKER_PATH)
 	@echo "Binarios creados en $(BUILD_DIR)/"
 
 ## test: Ejecuta todos los tests
