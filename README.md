@@ -1,5 +1,7 @@
 # Mikrom - Virtual Machine Management API
 
+[![Go](https://github.com/spluca/mikrom/actions/workflows/go.yml/badge.svg)](https://github.com/spluca/mikrom/actions/workflows/go.yml)
+
 A high-performance REST API for managing virtual machines built with Go, featuring asynchronous task processing, IP pool management, and gRPC-based VM provisioning via firecracker-agent.
 
 ## 🚀 Features
