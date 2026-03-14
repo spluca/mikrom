@@ -23,7 +23,9 @@ type Config struct {
 	RedisDB       int
 
 	// Firecracker Agent configuration (gRPC)
-	FirecrackerAgentAddr string
+	FirecrackerAgentAddr  string
+	FirecrackerDeployPath string
+	FirecrackerDefaultHost string
 
 	// Worker configuration
 	WorkerConcurrency int
@@ -50,7 +52,9 @@ func LoadConfig() *Config {
 		RedisDB:       getEnvInt("REDIS_DB", 0),
 
 		// Firecracker Agent (gRPC)
-		FirecrackerAgentAddr: getEnv("FIRECRACKER_AGENT_ADDR", "localhost:50051"),
+		FirecrackerAgentAddr:   getEnv("FIRECRACKER_AGENT_ADDR", "localhost:50051"),
+		FirecrackerDeployPath:  getEnv("FIRECRACKER_DEPLOY_PATH", "/path/to/firecracker-deploy"),
+		FirecrackerDefaultHost: getEnv("FIRECRACKER_DEFAULT_HOST", ""),
 
 		// Worker
 		WorkerConcurrency: getEnvInt("WORKER_CONCURRENCY", 10),
